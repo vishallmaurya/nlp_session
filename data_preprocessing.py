@@ -7,6 +7,8 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer, WordNetLemmatizer
+from gensim.models import Word2Vec
+
 
 # nltk.download('punkt')
 # nltk.download('stopwords')
@@ -89,7 +91,8 @@ def combine(tokens):
     data = []
     for i in range(len(tokens)):
         data.append(" ".join(tokens[i]))
-    return data 
+    return data
+
 
 df = pd.DataFrame(data)
 print(df)
@@ -103,5 +106,22 @@ updated_words = remove_stopwords(words)
 roots_words = lemmatize_words(updated_words)
 df['final text'] = combine(roots_words)
 print(df['final text'])
-# words(tokens)  # Or stem_words(tokens) for stemming
-# cleaned_text = " ".j
+
+
+
+
+sentences = [preprocess_text(sentence) for sentence in data['final text']] 
+word2vec_model = Word2Vec(sentences, vector_size=100, window=5, min_count=1, workers=4)
+
+
+def get_sentence_vector(sentence, model):
+    words = preprocess_text(sentence)
+    word_vectors = [model.wv[word] for word in words if word in model.wv]
+    if len(word_vectors) == 0:
+        return np.zeros(model.vector_size)  
+    sentence_vector = np.mean(word_vectors, axis=0)  
+    return sentence_vector
+
+# Apply to all sentences
+sentence_vectors = np.array([get_sentence_vector(sentence, word2vec_model) for sentence in data['final text']])
+
