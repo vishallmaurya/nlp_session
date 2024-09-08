@@ -10,6 +10,10 @@ data = ['hello', 'this', 'is', 'a', 'link', 'im', 'hostel']
 # print(data)
 # print(ans)
 
+
+stop_words = set(stopwords.words("english"))
+
+
 Stemming --> sneezing --> sneez
 lemmatizing --> sneezing --> sneeze
 
