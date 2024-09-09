@@ -4,15 +4,22 @@ import numpy as np
 import re
 import string
 import nltk
+import spacy
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer, WordNetLemmatizer
 from gensim.models import Word2Vec
 
 
-# nltk.download('punkt')
-# nltk.download('stopwords')
-# nltk.download('wordnet')
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('wordnet')
+nlp = spacy.load("en_core_web_sm")
+
+
+
+
+
 
 # importing the data
 
@@ -27,47 +34,38 @@ from gensim.models import Word2Vec
 
 
 data = {"text": ["hello ###this is a link https://chatgpt.com, i'm @hostel",
-                "#hello this is google link http://google.com@whatsapp @insta",
-                "hello this is mylink https://github",
-                "hello this is random link https://random"]}
+                "#hello this singing is google link http://google.com@whatsapp @insta",
+                "hello this is mylink improving  https://github",
+                "hellooooooooooooo this is random swimming eating link https://random",
+                "The swimming pool is beatuiful"]}
 
 
-def remove_links(df):
-    link_free = []
-    for i in range(df.shape[0]):
-        link_free.append(re.sub(r"http\S+", "", df.iloc[i]['text']))
-    return link_free
+def remove_links(df, column):
+    for i in range(len(df)):
+        df.loc[i, column] = re.sub(r"http\S+", "", df.loc[i, column])
 
-def remove_mentions(df):
+def remove_mentions(df, column):
+    for i in range(len(df)):
+        df.loc[i, column] = re.sub(r"@", "", df.loc[i, column])
+
+def remove_hashtags(df, column):
+    for i in range(len(df)):
+        df.loc[i, column] = re.sub(r"#", "", df.loc[i, column])
+
+def remove_special_chars(df, column):
+    for i in range(len(df)):
+        df.loc[i, column] = re.sub(r"[^a-zA-Z0-9\s]", "", df.loc[i, column])
+
+
+def to_lowercase(df, column):
+    for i in range(len(df)):
+        df.loc[i, column] = df.loc[i, column].lower()
+
+
+def tokenize_text(df, column):
     data = []
-    for i in range(df.shape[0]):
-        data.append(re.sub(r"@w+", "", df.iloc[i]['refine text']))
-    return data
-
-def remove_hashtags(df):
-    data = []
-    for i in range(df.shape[0]):
-        data.append(re.sub(r"#", "", df.iloc[i]['removed mentions']))
-    return data
-
-
-def remove_special_chars(text):
-    data = []
-    for i in range(df.shape[0]):
-        data.append(re.sub(r"[^a-zA-Z0-9\s]", "", df.iloc[i]['removed mentions']))
-    return data
-
-
-def to_lowercase(text):
-    data = []
-    for i in range(df.shape[0]):
-        data.append(df.iloc[i]['removed mentions'].lower())
-    return data
-
-def tokenize_text(df):
-    data = []
-    for i in range(df.shape[0]):
-        data.append(word_tokenize(df.iloc[i]['removed hash'].lower()))
+    for i in range(len(df)):
+        data.append(word_tokenize(df.loc[i, column]))
     return data
 
 
@@ -79,12 +77,13 @@ def remove_stopwords(tokens):
     return data
 
 
-def lemmatize_words(tokens):
-    lemmatizer = WordNetLemmatizer()
-    data = []
-    for i in range(len(tokens)):
-        data.append([lemmatizer.lemmatize(word) for word in tokens[i]])
-    return data
+def lemmatize_words_spacy(tokens):
+    lemmatized_data = []
+    for sentence in tokens:
+        doc = nlp(" ".join(sentence))
+        lemmatized_sentence = [token.lemma_ for token in doc]
+        lemmatized_data.append(lemmatized_sentence)
+    return lemmatized_data
 
 
 def combine(tokens):
@@ -94,34 +93,42 @@ def combine(tokens):
     return data
 
 
+
+def preprocess_data(df, column):
+    remove_links(df, column)
+    remove_mentions(df, column)
+    remove_hashtags(df, column)
+    remove_special_chars(df, column)
+    to_lowercase(df, column)
+    words = tokenize_text(df, column)
+    words = remove_stopwords(words)
+    words = lemmatize_words_spacy(words)
+    return words
+
+
+
+
 df = pd.DataFrame(data)
-print(df)
+print(df['text'])
+print("\n\n") 
 print("data after cleaning\n\n")
-df['refine text'] = remove_links(df)
-df['removed mentions'] = remove_mentions(df) 
-df['removed hash'] = remove_hashtags(df)
-# print(df['removed hash'])
-words = tokenize_text(df)
-updated_words = remove_stopwords(words)
-roots_words = lemmatize_words(updated_words)
-df['final text'] = combine(roots_words)
+df['final text'] = preprocess_data(df, 'text') ;
 print(df['final text'])
 
 
+word2vec_model = Word2Vec(df['final text'], vector_size=100, window=5, min_count=1, workers=4)
 
 
-sentences = [preprocess_text(sentence) for sentence in data['final text']] 
-word2vec_model = Word2Vec(sentences, vector_size=100, window=5, min_count=1, workers=4)
-
-
-def get_sentence_vector(sentence, model):
-    words = preprocess_text(sentence)
+def get_sentence_vector(words, model):
     word_vectors = [model.wv[word] for word in words if word in model.wv]
     if len(word_vectors) == 0:
-        return np.zeros(model.vector_size)  
+        return np.zeros(model.vector_size)
     sentence_vector = np.mean(word_vectors, axis=0)  
     return sentence_vector
 
-# Apply to all sentences
-sentence_vectors = np.array([get_sentence_vector(sentence, word2vec_model) for sentence in data['final text']])
+# # Apply to all sentences
+sentence_vectors = np.array([get_sentence_vector(sentence, word2vec_model) for sentence in df['final text']])
+print(sentence_vectors)
 
+
+# now we are ready to build the model
